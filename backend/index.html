@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WhatsApp Clone OTP Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  </head>
+  <body>
+    <h2>🔐 OTP Login Test</h2>
+
+    <div>
+      <label>Phone: </label>
+      <input type="text" id="phone" placeholder="+923001234567" />
+      <button onclick="requestOtp()">Request OTP</button>
+    </div>
+
+    <div>
+      <label>OTP: </label>
+      <input type="text" id="otp" placeholder="Enter OTP" />
+      <label>Name (optional): </label>
+      <input type="text" id="name" placeholder="Taimoor" />
+      <button onclick="verifyOtp()">Verify OTP</button>
+    </div>
+
+    <div>
+      <label>Token: </label>
+      <input type="text" id="token" placeholder="Paste JWT here" />
+      <button onclick="bindNumber()">Bind Number</button>
+    </div>
+
+    <hr />
+
+    <h2>💬 Send Message Test</h2>
+    <div>
+      <label>To Socket ID: </label>
+      <input type="text" id="to" placeholder="Receiver Socket ID" />
+      <label>Message: </label>
+      <input type="text" id="message" placeholder="Hello World" />
+      <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <pre id="log"></pre>
+
+    <script>
+      const socket = io("http://localhost:3000"); // change port if needed
+
+      const log = (msg) => {
+        document.getElementById("log").textContent += msg + "\n";
+      };
+
+      socket.on("connect", () => log("✅ Connected: " + socket.id));
+
+      // Listen for OTP sent
+      socket.on("otp_sent", (data) => {
+        log("📩 OTP sent: " + JSON.stringify(data));
+      });
+      
+      // Listen for login success
+      socket.on("login_success", (data) => {
+        log("✅ Login success: " + JSON.stringify(data));
+        document.getElementById("token").value = data.token; // auto-fill token
+      });
+
+      // Listen for errors
+      socket.on("login_error", (err) =>
+        log("❌ Login error: " + JSON.stringify(err))
+      );
+      socket.on("auth_error", (err) =>
+        log("❌ Auth error: " + JSON.stringify(err))
+      );
+
+      // Bind success
+      socket.on("bind_success", (data) =>
+        log("🔗 Bind success: " + JSON.stringify(data))
+      );
+
+      // Receive message
+      socket.on("receive-message", (data) => {
+        log("💬 Message received: " + JSON.stringify(data));
+      });
+
+      // Functions for buttons
+      function requestOtp() {
+        const phone = document.getElementById("phone").value;
+        socket.emit("request_otp", { phone });
+        log("➡️ Sent request_otp for " + phone);
+      }
+
+      function verifyOtp() {
+        const phone = document.getElementById("phone").value;
+        const otp = document.getElementById("otp").value;
+        const name = document.getElementById("name").value;
+        socket.emit("verify_otp", { phone, otp, name });
+        log("➡️ Sent verify_otp with " + otp);
+      }
+
+      function bindNumber() {
+        const token = document.getElementById("token").value;
+        socket.emit("bind_number", { token });
+        log("➡️ Sent bind_number with token");
+      }
+
+      function sendMessage() {
+        const to = document.getElementById("to").value;
+        const message = document.getElementById("message").value;
+        socket.emit("send-message", { to, message });
+        log("➡️ Sent message to " + to);
+      }
+    </script>
+  </body>
+</html>
