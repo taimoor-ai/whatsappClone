@@ -27,18 +27,24 @@ export const SocketProvider = ({ token, children }) => {
         // 2️⃣ Load messages
         const dbMessages = await getAllMessages();
 
-        // 3️⃣ Group messages by chat_id
-        const groupedMessages = {};
+        const getTime = (time) => {
+          if (typeof time === "number") return time;
+          return new Date(time).getTime();
+        };
 
-        dbMessages.forEach((msg) => {
-          if (!groupedMessages[msg.chat_id]) {
-            groupedMessages[msg.chat_id] = [];
-          }
-          groupedMessages[msg.chat_id].push(msg);
+        const groupedMessages = dbMessages.reduce((acc, msg) => {
+          if (!acc[msg.chat_id]) acc[msg.chat_id] = [];
+          acc[msg.chat_id].push(msg);
+          return acc;
+        }, {});
+
+        Object.keys(groupedMessages).forEach((chatId) => {
+          groupedMessages[chatId].sort(
+            (a, b) => getTime(a.sent_at) - getTime(b.sent_at),
+          );
         });
 
         setMessagesByChat(groupedMessages);
-
         console.log("✅ Chats & messages loaded from DB");
       } catch (error) {
         console.log("Error loading initial data:", error);

@@ -200,6 +200,7 @@ import MessageBubble from "../../components/MessageBubble";
 import MessageInput from "../../components/MessageInput";
 import { encryptMessage } from "../../utils/crypto";
 import { useSocket } from "../context/SocketContext"; //
+import { setChatAsRead } from "../database/chatQueries";
 // import context
 import { createChatIfNotExists } from "../database/chatQueries";
 import { insertMessage } from "../database/messageQueries";
@@ -245,7 +246,7 @@ export default function ChatId() {
         setChats((prev) =>
           prev.map((c) => (c.id === id ? { ...c, unReadCount: 0 } : c)),
         );
-
+        await setChatAsRead(id);
         // Update in DB
         await createChatIfNotExists({
           id: id,
