@@ -1,23 +1,43 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useContext, useState } from "react";
+import { useContext, useRef, useState } from "react";
 import { StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
 import { useSocket } from "../app/context/SocketContext";
 
 import { AuthContext } from "../app/context/authContext";
 export default function MessageInput({ recieverId, setSavedLocal }) {
-  console.log(recieverId);
   const [text, setText] = useState("");
   const { socket } = useSocket(); //
   const { token, setToken } = useContext(AuthContext);
-
   console.log("Token:", token);
+  console.log("ReciverId : ", recieverId);
   const sendMessage = () => {
     if (!text || !socket) return;
-    setSavedLocal(text);
+    socket.emit("stop-typing", { recieverId });
+    isTypingRef.current = false;
 
+    setSavedLocal(text);
     setText("");
   };
+  const isTypingRef = useRef(false);
+  const typingTimeoutRef = useRef(null);
 
+  const handleTyping = (value) => {
+    setText(value);
+
+    if (!socket) return;
+
+    if (!isTypingRef.current) {
+      socket.emit("typing", { recieverId });
+      isTypingRef.current = true;
+    }
+
+    clearTimeout(typingTimeoutRef.current);
+
+    typingTimeoutRef.current = setTimeout(() => {
+      socket.emit("stop-typing", { recieverId });
+      isTypingRef.current = false;
+    }, 2000);
+  };
   const isEmpty = text.trim().length === 0;
 
   return (
@@ -28,7 +48,7 @@ export default function MessageInput({ recieverId, setSavedLocal }) {
         placeholderTextColor="#ccc"
         value={text}
         caretColor="red"
-        onChangeText={setText}
+        onChangeText={handleTyping}
       />
 
       <TouchableOpacity

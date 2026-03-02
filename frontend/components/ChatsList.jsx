@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { FlatList, Image, Text, TouchableOpacity, View } from "react-native";
 import { useSelector } from "react-redux";
+import { useSocket } from "../app/context/SocketContext";
 import { decryptMessage } from "../utils/crypto";
 import SearchBar from "./SearchBar";
 export default function ChatList({ Chats = [], changeVisible, isVisible }) {
@@ -12,7 +13,7 @@ export default function ChatList({ Chats = [], changeVisible, isVisible }) {
   console.log("Contacts from Redux:", contacts);
   // const filteredData = [...Chats]; // default to Chats
   // ✅ UseMemo to recompute only when searchValue/contacts/Chats changes
-
+  const { typingUsers } = useSocket();
   const filteredData = useMemo(() => {
     const safeContacts = contacts?.registeredUsers || [];
     console.log("safe Contacts: ", safeContacts);
@@ -128,8 +129,8 @@ export default function ChatList({ Chats = [], changeVisible, isVisible }) {
             {/* Avatar */}
             <Image
               source={
-                item.avatar
-                  ? { uri: item.avatar } // if user has image
+                item.avatarUrl || item.profilePic
+                  ? { uri: item.avatarUrl || item.profilePic } // if user has image
                   : require("../assets/images/default_profile.png") // fallback to local default
               }
               className="w-12 h-12 rounded-full"
@@ -150,16 +151,17 @@ export default function ChatList({ Chats = [], changeVisible, isVisible }) {
               <View className="flex-row justify-between items-center mt-1">
                 <Text
                   className={`text-sm ${
-                    item.unReadCount > 0
-                      ? "font-bold text-gray-500"
-                      : "text-gray-500"
+                    typingUsers[item.id]
+                      ? "text-green-500 italic"
+                      : item.unReadCount > 0
+                        ? "font-bold text-gray-500"
+                        : "text-gray-500"
                   }`}
                   numberOfLines={1}
                 >
-                  {
-                    decryptMessage(item.lastMessageText) || item.about
-                    // (item.type === "contact" ? "Contact" : "")}
-                  }
+                  {typingUsers[item.id]
+                    ? "Typing..."
+                    : decryptMessage(item.lastMessageText) || item.about}
                 </Text>
 
                 {item.unReadCount > 0 && (

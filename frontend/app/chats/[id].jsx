@@ -419,8 +419,9 @@ export default function ChatId() {
         />
         <ChatHeader
           name={parsedUser ? parsedUser.name : chat?.name || "Chat"}
-          profilePic={chat?.avatar}
+          profilePic={chat?.avatarUrl}
           isGroup={isGroup === "true"}
+          id={id}
         />
         <ImageBackground
           source={require("../../assets/images/chatBackground.jpeg")}

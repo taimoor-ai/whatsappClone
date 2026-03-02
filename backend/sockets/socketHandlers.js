@@ -85,6 +85,9 @@ const registerSocketHandlers = (io, socket) => {
   //   }
   // });
 
+
+
+
   // ✅ Bind Number from Token (next time user connects)
   socket.on("bind_number", async ({ token }) => {
     try {
@@ -113,25 +116,7 @@ const registerSocketHandlers = (io, socket) => {
       socket.emit("auth_error", { error: "Invalid or expired token" });
     }
   });
-  // When socket disconnects
-  socket.on("disconnect", async () => {
-    try {
-      console.log(`❌ Socket ${socket.id} disconnected`);
-
-      // Find the user that was bound to this socket
-      const user = await User.findOne({ socketId: socket.id });
-
-      if (user) {
-        // Clear socketId (unbind phone from socket)
-        user.socketId = null;
-        await user.save();
-
-        console.log(`🔓 Cleared socket binding for ${user.phoneNumber}`);
-      }
-    } catch (err) {
-      console.error("❌ Error clearing socket binding:", err);
-    }
-  });
+  
 
 
 socket.on("send-message", async (data) => {
@@ -181,4 +166,4 @@ socket.on("send-message", async (data) => {
 
 };
 
-module.exports = { registerSocketHandlers };
+module.exports = { registerSocketHandlers }; 

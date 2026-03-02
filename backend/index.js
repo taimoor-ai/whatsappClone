@@ -4,12 +4,13 @@ const http = require("http");
 const jwt = require("jsonwebtoken");
 const { Server } = require("socket.io");
 const { connectDB } = require("./db.js");
+const User = require("./models/Users.js");
 const server = http.createServer(app);
 const { registerSocketHandlers } = require("./sockets/socketHandlers.js");
 const dotenv = require("dotenv");
 const UndeliveredMessage = require("./models/undeliveredMessage.js");
 const authRoutes = require("./routes/authRoutes.js");
-const undeliveredRoutes = require("./routes/undeliveredRoutes.js")
+const undeliveredRoutes = require("./routes/undeliveredRoutes.js");
 // Middleware
 
 dotenv.config();
@@ -52,19 +53,80 @@ io.use((socket, next) => {
   } catch (err) {
     console.log("❌ Invalid or expired token:", err.message);
     next(new Error("Unauthorized"));
-  } 
+  }
 });
+const onlineUsers = {}; // in-memory object
 
-io.on("connection",async  (socket) => {
+io.on("connection", async (socket) => {
   console.log("New socket connected:", socket.id);
   registerSocketHandlers(io, socket);
+  onlineUsers[socket.user.id] = socket.id;
+  console.log("Online USERS : ", onlineUsers);
+ socket.on("typing", ({ recieverId }) => {
+  console.log(
+    "Typing event received from",
+    socket.user.phone,
+    "to",
+    recieverId
+  );
 
- 
+  const receiverSocketId = onlineUsers[recieverId];
+
+  if (receiverSocketId) {
+    io.to(receiverSocketId).emit("user-typing", {
+      senderId: socket.user.id,     // 🔥 IMPORTANT
+      phoneNumber: socket.user.phone, // optional
+    });
+  }else{
+    console.log("the typing event is delivered to user ");
+  }
+});
+
+socket.on("stop-typing", ({ recieverId }) => {
+  console.log(
+    "Stop typing event received from",
+    socket.user.phone,
+    "to",
+    recieverId
+  );
+
+  const receiverSocketId = onlineUsers[recieverId];
+
+  if (receiverSocketId) {
+    io.to(receiverSocketId).emit("user-stop-typing", {
+      senderId: socket.user.id,  // 🔥 IMPORTANT
+    });
+  }else{
+    console.log("the stop typing event is delivered to user ");
+  }
+});
   socket.emit("bind_number", { token: socket.handshake.auth?.token });
-   const undelivered = await UndeliveredMessage.find({
-    receiverId: socket.user.id
+  const undelivered = await UndeliveredMessage.find({
+    receiverId: socket.user.id,
   }).sort({ sentAt: 1 });
-   console.log("Undelivered : ",undelivered);
+
+  // When socket disconnects
+  socket.on("disconnect", async () => {
+    try {
+      delete onlineUsers[socket.user.id];
+      console.log("Online USERS : ", onlineUsers);
+      console.log(`❌ Socket ${socket.id} disconnected`);
+
+      // Find the user that was bound to this socket
+      const user = await User.findOne({ socketId: socket.id });
+
+      if (user) {
+        // Clear socketId (unbind phone from socket)
+        user.socketId = null;
+        await user.save();
+
+        console.log(`🔓 Cleared socket binding for ${user.phoneNumber}`);
+      }
+    } catch (err) {
+      console.error("❌ Error clearing socket binding:", err);
+    }
+  });
+  console.log("Undelivered : ", undelivered);
   // ✅ Send them to client
   socket.emit("undelivered-messages", undelivered);
 

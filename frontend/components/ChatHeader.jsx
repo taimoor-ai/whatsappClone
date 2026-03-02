@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "expo-router";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-export default function ChatHeader({ name, profilePic, isGroup }) {
+import { useSocket } from "../app/context/SocketContext";
+export default function ChatHeader({ name, profilePic, id, isGroup }) {
   const navigation = useNavigation();
- 
 
+  const { typingUsers } = useSocket();
   return (
     <View style={styles.header}>
       <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -22,7 +23,9 @@ export default function ChatHeader({ name, profilePic, isGroup }) {
 
       <View style={styles.info}>
         <Text style={styles.name}>{name || "Chat"}</Text>
-        <Text style={styles.status}>{isGroup ? "Group Chat" : "Online"}</Text>
+        <Text style={styles.status}>
+          {typingUsers[id] ? "Typing..." : "Online"}
+        </Text>
       </View>
 
       <View style={styles.actions}>
