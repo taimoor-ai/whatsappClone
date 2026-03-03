@@ -23,6 +23,30 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
   },
 });
+
+const multer = require("multer");
+const multerS3 = require("multer-s3");
+const s3 = require("./config/s3.js");
+
+const upload = multer({
+  storage: multerS3({
+    s3: s3,
+    bucket: "teymur-chat-images",
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    key: function (req, file, cb) {
+      console.log("i am call");
+      cb(null, `chat-images/${Date.now()}-${file.originalname}`);
+    },
+  }),
+});
+
+app.post("/api/upload", upload.single("image"), (req, res) => {
+  console.log("i am called bro ther")
+  res.json({
+    imageUrl: req.file.location, // S3 URL
+  });
+});
+
 app.use((req, res, next) => {
   console.log("HTTP Request:", req.method, req.url);
   next();
@@ -42,6 +66,7 @@ io.use((socket, next) => {
   }
 
   try {
+
     // ✅ Verify JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 

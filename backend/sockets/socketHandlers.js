@@ -119,51 +119,132 @@ const registerSocketHandlers = (io, socket) => {
   
 
 
-socket.on("send-message", async (data) => {
-  const {
-    token,
-    recieverId,
-    content,
-    messageType = "text",
-  } = data;
-  console.log("data", data);
- const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  const senderId = decoded.id;
-  const senderNumber = decoded.phone;
-  console.log("reciverID",recieverId)
-  const recieverUser = await User.findById(recieverId);
-  const  receiverNumber =recieverUser.phoneNumber;
-  const receiverSocketId = recieverUser ? recieverUser.socketId : null;
+// socket.on("send-message", async (data) => {
+//   const {
+//     token,
+//     recieverId,
+//     content,
+//     messageType = "text",
+//   } = data;
+//   console.log("data", data);
+//  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+//   const senderId = decoded.id;
+//   const senderNumber = decoded.phone;
+//   console.log("reciverID",recieverId)
+//   const recieverUser = await User.findById(recieverId);
+//   const  receiverNumber =recieverUser.phoneNumber;
+//   const receiverSocketId = recieverUser ? recieverUser.socketId : null;
 
-  if (receiverSocketId) {
-    // Receiver ONLINE → send instantly
-    io.to(receiverSocketId).emit("receive-message", {
+//   if (receiverSocketId) {
+//     // Receiver ONLINE → send instantly
+//     io.to(receiverSocketId).emit("receive-message", {
+//       senderId,
+//       senderNumber,
+//       content,
+//       messageType,
+//       receiverId: recieverId,
+//       receiverNumber,
+//       sentAt: new Date(),
+//     });
+
+//     console.log(`Message delivered to ${receiverNumber}`);
+
+//   } else {
+//     // Receiver OFFLINE → save to DB
+//     const message = await UndeliveredMessage.create({
+//       senderId,
+//       senderNumber,
+//       receiverId:recieverUser._id,
+//       receiverNumber,
+//       content,
+//       messageType,
+//     });
+
+//     console.log(`Saved Undelivered Message for ${receiverNumber}:`, message);
+//   }
+// });
+  socket.on("send-message", async (data) => {
+  try {
+    const {
+      token,
+      recieverId,
+      content,
+      messageType = "text",
+    } = data;
+
+    if (!token || !recieverId || !content) {
+      return socket.emit("error-message", {
+        message: "Invalid message payload",
+      });
+    }
+
+    // 🔐 Verify JWT
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const senderId = decoded.id;
+    const senderNumber = decoded.phone;
+
+    // 🔎 Find Receiver
+    const recieverUser = await User.findById(recieverId);
+    if (!recieverUser) {
+      return socket.emit("error-message", {
+        message: "Receiver not found",
+      });
+    }
+
+    const receiverNumber = recieverUser.phoneNumber;
+    const receiverSocketId = recieverUser.socketId;
+
+    // 📦 Build Message Object
+    const messagePayload = {
       senderId,
       senderNumber,
+      receiverId: recieverUser._id,
+      receiverNumber,
       content,
       messageType,
-      receiverId: recieverId,
-      receiverNumber,
+      mediaUrl: messageType === "image" ? content : null, // if it's an image, treat content as URL
       sentAt: new Date(),
+    };
+
+    // 🖼️ If Image → Basic Validation
+    if (messageType === "image") {
+      if (!content.startsWith("http")) {
+        return socket.emit("error-message", {
+          message: "Invalid image URL",
+        });
+      }
+    }
+
+    // ===============================
+    // 📡 If Receiver is ONLINE
+    // ===============================
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("receive-message", messagePayload);
+
+      console.log(`✅ Message delivered to ${receiverNumber}`);
+    } 
+    // ===============================
+    // 💾 If Receiver is OFFLINE
+    // ===============================
+    else {
+      const message = await UndeliveredMessage.create(messagePayload);
+
+      console.log(
+        `💾 Saved Undelivered Message for ${receiverNumber}:`,
+        message
+      );
+    }
+
+    // (Optional) Emit back to sender for confirmation
+    socket.emit("message-sent", messagePayload);
+
+  } catch (err) {
+    console.error("❌ send-message error:", err.message);
+    socket.emit("error-message", {
+      message: "Message sending failed",
     });
-
-    console.log(`Message delivered to ${receiverNumber}`);
-
-  } else {
-    // Receiver OFFLINE → save to DB
-    const message = await UndeliveredMessage.create({
-      senderId,
-      senderNumber,
-      receiverId:recieverUser._id,
-      receiverNumber,
-      content,
-      messageType,
-    });
-
-    console.log(`Saved Undelivered Message for ${receiverNumber}:`, message);
   }
 });
-
 };
 
 module.exports = { registerSocketHandlers }; 

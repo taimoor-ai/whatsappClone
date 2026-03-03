@@ -1,15 +1,30 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { jwtDecode } from "jwt-decode";
+import { useEffect, useMemo, useState } from "react";
 import { FlatList, Image, Text, TouchableOpacity, View } from "react-native";
 import { useSelector } from "react-redux";
 import { useSocket } from "../app/context/SocketContext";
 import { decryptMessage } from "../utils/crypto";
 import SearchBar from "./SearchBar";
+
 export default function ChatList({ Chats = [], changeVisible, isVisible }) {
   const [searchValue, changeSearchValue] = useState("");
   const contacts = useSelector((state) => state.contacts.list); // might be undefined
   const router = useRouter();
+  const [myId, setMyId] = useState(null);
 
+  useEffect(() => {
+    const loadUser = async () => {
+      const token = await AsyncStorage.getItem("authToken");
+      if (token) {
+        const decoded = jwtDecode(token);
+        setMyId(decoded.id);
+      }
+    };
+
+    loadUser();
+  }, []);
   console.log("Contacts from Redux:", contacts);
   // const filteredData = [...Chats]; // default to Chats
   // ✅ UseMemo to recompute only when searchValue/contacts/Chats changes
@@ -75,7 +90,32 @@ export default function ChatList({ Chats = [], changeVisible, isVisible }) {
       iconPress={changeVisible2}
     />
   );
+  const renderLastMessagePreview = (item) => {
+    if (!item.lastMessageText && !item.lastMessageType) {
+      return item.about || "";
+    }
 
+    let previewText = "";
+
+    if (item.lastMessageType === "image") {
+      previewText = "📷 Image";
+    } else if (item.lastMessageType === "text") {
+      try {
+        previewText = decryptMessage(item.lastMessageText);
+      } catch (err) {
+        previewText = item.lastMessageText;
+      }
+    } else {
+      previewText = item.lastMessageText;
+    }
+
+    // ✅ Add prefix only if message is mine
+    if (item.lastMessageSenderId === myId) {
+      return `You: ${previewText}`;
+    }
+
+    return previewText;
+  };
   return (
     <View className={`flex-1 min-w-full px-4 ${isVisible ? "pb-32" : ""}`}>
       {!isVisible && searchBarComponent}
@@ -161,7 +201,7 @@ export default function ChatList({ Chats = [], changeVisible, isVisible }) {
                 >
                   {typingUsers[item.id]
                     ? "Typing..."
-                    : decryptMessage(item.lastMessageText) || item.about}
+                    : renderLastMessagePreview(item)}
                 </Text>
 
                 {item.unReadCount > 0 && (

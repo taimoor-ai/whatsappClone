@@ -43,6 +43,10 @@ const undeliveredMessageSchema = new mongoose.Schema(
       type: String,
       enum: ["pending", "delivered"],
       default: "pending"
+    },
+    mediaUrl: {
+      type: String,
+      default: null
     }
   },
   { timestamps: true }

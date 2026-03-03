@@ -1,10 +1,16 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { decryptMessage } from "../utils/crypto";
+
 export default function MessageBubble({ message }) {
   const isMe = message.isMe;
-  const date = new Date(message.sent_at);
-  // 🔓 Decrypt only for display
-  const decryptedText = decryptMessage(message.content);
+  const date = new Date(message.sentAt || message.sent_at);
+
+  const isImage = message.message_type === "image";
+
+  // 🔓 Decrypt ONLY if text message
+  const decryptedText =
+    !isImage && message.content ? decryptMessage(message.content) : null;
+
   return (
     <View
       style={[
@@ -14,8 +20,23 @@ export default function MessageBubble({ message }) {
       ]}
     >
       {!isMe && <Text style={styles.sender}>{message.sender}</Text>}
-      <Text style={styles.text}>{decryptedText}</Text>
-      <Text style={styles.time}>{date.toLocaleString()}</Text>
+
+      {/* 🖼️ IMAGE MESSAGE */}
+      {isImage ? (
+        <Image
+          source={{ uri: message.media_url || message.content }} // Support both new and old schema
+          style={styles.image}
+          resizeMode="cover"
+        />
+      ) : (
+        /* 💬 TEXT MESSAGE */
+        <Text style={styles.text}>{decryptedText}</Text>
+      )}
+
+      <Text style={styles.time}>
+        {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+      </Text>
+
       <View
         style={[styles.tail, isMe ? styles.sentTail : styles.receivedTail]}
       />
@@ -34,35 +55,41 @@ const styles = StyleSheet.create({
   /* Position */
   left: {
     alignSelf: "flex-start",
-    paddingTop: 0,
     backgroundColor: "#333e4a",
+    borderTopLeftRadius: 0,
   },
   right: {
     alignSelf: "flex-end",
     backgroundColor: "#003833",
-  },
-
-  /* Bubble tail effect */
-  leftBubble: {
-    borderTopLeftRadius: 0, // missing corner for incoming messages
-  },
-  rightBubble: {
-    borderTopRightRadius: 0, // missing corner for outgoing messages
+    borderTopRightRadius: 0,
   },
 
   text: {
     fontSize: 16,
     color: "#fff",
   },
+
+  image: {
+    width: 200,
+    height: 200,
+    borderRadius: 10,
+    marginVertical: 5,
+  },
+
   sender: {
     fontWeight: "bold",
     fontSize: 12,
-    marginBottom: 2,
+    marginBottom: 4,
     color: "#0287c3",
   },
+
   time: {
     fontSize: 10,
-    color: "#777",
+    color: "#aaa",
     alignSelf: "flex-end",
+    marginTop: 4,
   },
+
+  /* Optional tail placeholder */
+  tail: {},
 });

@@ -262,13 +262,18 @@ export default function ChatId() {
   }, [id]);
 
   // Store new local message (send + update context + DB)
-  const storeLocalMessage = async (content) => {
+  const storeLocalMessage = async (
+    content,
+    messageType = "text",
+    mediaUrl = null,
+  ) => {
     try {
       const token = await AsyncStorage.getItem("authToken");
       const decoded = jwtDecode(token);
       console.log("content : ", content);
-      const encryptedContent = await encryptMessage(content);
-      console.log("encruyptedContent : ", encryptedContent);
+      const encryptedContent =
+        messageType === "text" ? await encryptMessage(content) : null;
+
       const newMessage = {
         message_id: Date.now().toString(),
         chat_id: id,
@@ -277,11 +282,11 @@ export default function ChatId() {
         receiver_id: id,
         receiver_phone: parsedUser?.phoneNumber || "N/A",
         content: encryptedContent,
-        message_type: "text",
+        message_type: messageType,
         sent_at: Date.now(),
         isMe: true,
         reply_to: null,
-        media_url: null,
+        media_url: mediaUrl,
       };
 
       // 1️⃣ Update messages in context
@@ -298,7 +303,9 @@ export default function ChatId() {
             c.id === id
               ? {
                   ...c,
-                  lastMessageText: newMessage.content,
+                  lastMessageSenderId: decoded.id,
+                  lastMessageText:
+                    messageType === "text" ? newMessage.content : "📷 Image",
                   lastMessageTime: newMessage.sent_at,
                 }
               : c,
@@ -309,8 +316,10 @@ export default function ChatId() {
               id: id,
               name: parsedUser?.name || "Chat",
               avatarUrl: parsedUser?.avatar || null,
-              lastMessageText: newMessage.content,
+              lastMessageText:
+                messageType === "text" ? newMessage.content : "📷 Image",
               lastMessageTime: newMessage.sent_at,
+              lastMessageSenderId: decoded.id,
               unReadCount: 0,
             },
             ...prev,
@@ -327,10 +336,11 @@ export default function ChatId() {
       await insertMessage(newMessage);
 
       const messageData = {
-        recieverId: id, // Replace with actual receiver ID
+        recieverId: id,
         token: token,
         content: encryptedContent,
-        messageType: "text",
+        messageType: messageType,
+        mediaUrl: mediaUrl,
       };
       // 4️⃣ Send via socket
       socket?.emit("send-message", messageData);
