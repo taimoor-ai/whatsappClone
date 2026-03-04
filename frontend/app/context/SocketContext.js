@@ -1,7 +1,11 @@
 import Constants from "expo-constants";
 import { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
-import { createChatIfNotExists, getAllChats } from "../database/chatQueries";
+import {
+  createChatIfNotExists,
+  getAllChats,
+  getChatById,
+} from "../database/chatQueries";
 import { getAllMessages, insertMessage } from "../database/messageQueries";
 
 const { EXPO_SOCKET_URL } = Constants.expoConfig.extra;
@@ -80,6 +84,87 @@ export const SocketProvider = ({ token, children }) => {
     // ===============================
     // RECEIVE MESSAGE
     // ===============================
+    newSocket.on("undelivered-messages", async (messages) => {
+      console.log("📩 Undelivered messages received:", messages);
+
+      for (const msg of messages) {
+        const chatId = msg.senderId; // sender is OTHER user
+
+        // ============================
+        // 1️⃣ CHECK / CREATE CHAT
+        // ============================
+        let chat = await getChatById(chatId);
+
+        if (!chat) {
+          chat = {
+            id: chatId,
+            name: msg.sender_name || chatId,
+            avatarUrl: null,
+            lastMessageText: msg.content,
+            lastMessageTime: msg.sentAt,
+            unReadCount: 1,
+          };
+
+          // Persist in DB
+          await createChatIfNotExists({
+            id: chat.id,
+            name: chat.name,
+            avatar: chat.avatarUrl,
+          });
+
+          // Add to context
+          setChats((prev) => [chat, ...prev]);
+        } else {
+          // Update chat preview for existing chat
+          setChats((prevChats) =>
+            prevChats.map((c) =>
+              c.id === chatId
+                ? {
+                    ...c,
+                    lastMessageText: msg.content,
+                    lastMessageTime: msg.sentAt,
+                    unReadCount: (c.unReadCount || 0) + 1,
+                  }
+                : c,
+            ),
+          );
+        }
+
+        // ============================
+        // 2️⃣ CREATE MESSAGE OBJECT
+        // ============================
+        const newMessage = {
+          message_id: Date.now().toString(),
+          chat_id: chatId,
+          sender_id: msg.senderId,
+          sender_phone: msg.senderNumber,
+          receiver_id: msg.receiverId,
+          receiver_phone: msg.recieverNumber || "N/A",
+          content: msg.content,
+          message_type: msg.messageType,
+          sent_at: msg.sentAt,
+          isMe: false,
+          reply_to: null,
+          media_url: msg.mediaUrl || null,
+        };
+
+        // ============================
+        // 3️⃣ INSERT INTO DATABASE
+        // ============================
+        await insertMessage(newMessage);
+
+        // ============================
+        // 4️⃣ UPDATE CONTEXT STATE
+        // ============================
+        setMessagesByChat((prev) => {
+          const existingMessages = prev[chatId] || [];
+          return {
+            ...prev,
+            [chatId]: [...existingMessages, newMessage],
+          };
+        });
+      }
+    });
     newSocket.on("receive-message", async (data) => {
       const chatId = data.senderId;
 

@@ -6,7 +6,7 @@ export const createTables = async () => {
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS chats (
           id TEXT PRIMARY KEY,
-  type TEXT,
+  message_type TEXT,
   name TEXT,
   avatarUrl TEXT,
   lastMessageText TEXT,
