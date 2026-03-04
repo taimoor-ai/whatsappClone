@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Modal,
@@ -10,8 +10,10 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+
 import Icon from "react-native-vector-icons/FontAwesome5";
 import ChatList from "../../components/ChatsList";
+import { AuthContext } from "../context/authContext";
 import { useSocket } from "../context/SocketContext";
 import { getAllChats } from "../database/chatQueries";
 import { debugDatabase } from "../database/debugDb";
@@ -37,6 +39,7 @@ export default function Chats() {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const router = useRouter();
+  const { setToken } = useContext(AuthContext);
 
   const handleLogout = async () => {
     try {
@@ -46,7 +49,7 @@ export default function Chats() {
       // 2️⃣ Remove auth token
       await AsyncStorage.removeItem("authToken");
       console.log("Token removed successfully");
-
+      setToken(null);
       // 3️⃣ Navigate to login
       router.replace("/login"); // adjust path if needed
 
